@@ -113,7 +113,7 @@
         <!-- Rendered Site Blocks -->
         <div id="siteRoot" class="flex-1 flex flex-col"></div>
         <!-- Empty State -->
-        <div id="emptyState" class="hidden flex-1 flex flex-col items-center justify-center p-12 text-center text-slate-400">
+        <div id="emptyState" class="hidden flex-1 flex-col items-center justify-center p-12 text-center text-slate-400">
           <div class="text-4xl mb-3">🧱</div>
           <p class="text-sm font-semibold text-slate-600">Холст пока пуст</p>
           <p class="text-xs mt-1 max-w-xs">Выбери любой блок в левой панели или загрузи готовый шаблон сверху.</p>
@@ -134,7 +134,7 @@
   </div>
 
   <!-- Templates Modal -->
-  <div id="templatesModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+  <div id="templatesModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
       <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
         <h2 class="font-bold text-slate-900 text-base">Выбрать стартовый шаблон</h2>
@@ -145,7 +145,7 @@
   </div>
 
   <!-- Export Modal -->
-  <div id="exportModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+  <div id="exportModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 flex flex-col max-h-[88vh]">
       <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
         <div>
@@ -169,7 +169,7 @@
   </div>
 
   <!-- Confirm Clear Modal -->
-  <div id="confirmModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+  <div id="confirmModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 border border-slate-200">
       <h3 class="font-bold text-slate-900 text-base">Очистить весь холст?</h3>
       <p class="text-xs text-slate-500 mt-1.5">Все текущие блоки будут удалены. При необходимости действие можно отменить кнопкой «Отменить».</p>
@@ -780,10 +780,10 @@
 
         if (!state.blocks.length) {
           root.innerHTML = '';
-          empty.classList.remove('hidden');
+          empty.classList.replace('hidden', 'flex');
           return;
         }
-        empty.classList.add('hidden');
+        empty.classList.replace('flex', 'hidden');
 
         root.innerHTML = state.blocks.map((blk, idx) => {
           const isSel = blk.id === selectedBlockId && !previewMode;
@@ -1286,25 +1286,25 @@ ${bodyHtml}
             selectedBlockId = state.blocks[0]?.id || null;
             saveState();
             renderAll();
-            tplModal.classList.add('hidden');
+            tplModal.classList.replace('flex', 'hidden');
             showToast('Шаблон загружен');
           });
         });
-        tplModal.classList.remove('hidden');
+        tplModal.classList.replace('hidden', 'flex');
       });
-      document.getElementById('closeTemplatesModal').addEventListener('click', () => tplModal.classList.add('hidden'));
+      document.getElementById('closeTemplatesModal').addEventListener('click', () => tplModal.classList.replace('flex', 'hidden'));
 
       // Clear Canvas Modal
       const confirmModal = document.getElementById('confirmModal');
-      document.getElementById('btnClearCanvas').addEventListener('click', () => confirmModal.classList.remove('hidden'));
-      document.getElementById('cancelClear').addEventListener('click', () => confirmModal.classList.add('hidden'));
+      document.getElementById('btnClearCanvas').addEventListener('click', () => confirmModal.classList.replace('hidden', 'flex'));
+      document.getElementById('cancelClear').addEventListener('click', () => confirmModal.classList.replace('flex', 'hidden'));
       document.getElementById('confirmClear').addEventListener('click', () => {
         pushHistory();
         state.blocks = [];
         selectedBlockId = null;
         saveState();
         renderAll();
-        confirmModal.classList.add('hidden');
+        confirmModal.classList.replace('flex', 'hidden');
         showToast('Холст очищен');
       });
 
@@ -1312,9 +1312,9 @@ ${bodyHtml}
       const exportModal = document.getElementById('exportModal');
       document.getElementById('btnExport').addEventListener('click', () => {
         document.getElementById('exportCodePreview').textContent = buildExportHtml();
-        exportModal.classList.remove('hidden');
+        exportModal.classList.replace('hidden', 'flex');
       });
-      document.getElementById('closeExportModal').addEventListener('click', () => exportModal.classList.add('hidden'));
+      document.getElementById('closeExportModal').addEventListener('click', () => exportModal.classList.replace('flex', 'hidden'));
 
       document.getElementById('btnCopyCode').addEventListener('click', () => {
         const code = buildExportHtml();
