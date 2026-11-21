@@ -212,8 +212,11 @@
             padding: 'sm',
             align: 'left',
             brand: 'VibeStudio',
+            brandUrl: '#top',
             links: 'О нас, Возможности, Тарифы',
-            ctaText: 'Начать'
+            linkUrls: '#top, #features, #pricing',
+            ctaText: 'Начать',
+            ctaUrl: '#cta'
           })
         },
         {
@@ -229,7 +232,9 @@
             title: 'Собирай сайты легко и без лишнего кода',
             subtitle: 'Минималистичный визуальный конструктор: добавляй готовые секции, настраивай цвета и выгружай чистый HTML за пару кликов.',
             ctaText: 'Попробовать бесплатно',
-            secondaryText: 'Узнать больше'
+            ctaUrl: '#cta',
+            secondaryText: 'Узнать больше',
+            secondaryUrl: '#features'
           })
         },
         {
@@ -263,6 +268,7 @@
             title: 'Сфокусируйся на смысле, а не на вёрстке',
             text: 'Редактируй тексты прямо на странице или через боковую панель. Каждый блок автоматически подстраивается под выбранную цветовую схему и размер экрана.',
             ctaText: 'Смотреть демо',
+            ctaUrl: '#cta',
             visualEmoji: '💻',
             visualCaption: 'Готово к публикации'
           })
@@ -279,9 +285,9 @@
             title: 'Прозрачные тарифы',
             subtitle: 'Начни бесплатно и масштабируйся по мере роста.',
             plans: [
-              { name: 'Старт', price: '0 ₽', desc: 'Для личных проектов', features: '1 проект\nЭкспорт в HTML\nБазовые блоки', featured: false },
-              { name: 'Про', price: '990 ₽/мес', desc: 'Для фрилансеров и студий', features: 'Безлимит проектов\nВсе цветовые темы\nПриоритетная поддержка', featured: true },
-              { name: 'Команда', price: '2 490 ₽/мес', desc: 'Для совместной работы', features: 'До 10 участников\nОбщие шаблоны\nБрендирование', featured: false }
+              { name: 'Старт', price: '0 ₽', desc: 'Для личных проектов', features: '1 проект\nЭкспорт в HTML\nБазовые блоки', ctaText: 'Выбрать', ctaUrl: '#cta', featured: false },
+              { name: 'Про', price: '990 ₽/мес', desc: 'Для фрилансеров и студий', features: 'Безлимит проектов\nВсе цветовые темы\nПриоритетная поддержка', ctaText: 'Выбрать', ctaUrl: '#cta', featured: true },
+              { name: 'Команда', price: '2 490 ₽/мес', desc: 'Для совместной работы', features: 'До 10 участников\nОбщие шаблоны\nБрендирование', ctaText: 'Выбрать', ctaUrl: '#cta', featured: false }
             ]
           })
         },
@@ -327,7 +333,8 @@
             align: 'left',
             brand: 'VibeStudio',
             copy: '© 2026 VibeStudio. Сделано с любовью.',
-            links: 'Политика, Контакты, Telegram'
+            links: 'Политика, Контакты, Telegram',
+            linkUrls: 'https://example.com/policy, https://example.com/contacts, https://t.me/example'
           })
         }
       ];
@@ -450,6 +457,15 @@
           el.classList.remove('opacity-100');
           el.classList.add('opacity-0');
         }, 2200);
+      }
+
+      function safeHref(url, fallback = '#top') {
+        const u = String(url ?? '').trim();
+        return u || fallback;
+      }
+
+      function extAttrs(href) {
+        return /^https?:\/\//i.test(href) ? ' target="_blank" rel="noopener noreferrer"' : '';
       }
 
       function esc(str) {
@@ -583,13 +599,19 @@
 
         if (blk.type === 'navbar') {
           const links = (d.links || '').split(',').map(s => s.trim()).filter(Boolean);
+          const urls = (d.linkUrls || '').split(',').map(s => s.trim());
+          const brandHref = safeHref(d.brandUrl, '#top');
+          const ctaHref = safeHref(d.ctaUrl, '#cta');
           return `
             <header style="background:${st.bg};color:${st.fg};border-bottom:1px solid ${st.borderCol};padding:16px 24px;">
               <div style="max-width:1040px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-                <div ${ce} data-field="brand" style="font-weight:800;font-size:18px;letter-spacing:-0.02em;">${esc(d.brand)}</div>
+                <a href="${esc(brandHref)}"${extAttrs(brandHref)} style="color:inherit;text-decoration:none;font-weight:800;font-size:18px;letter-spacing:-0.02em;"><span ${ce} data-field="brand">${esc(d.brand)}</span></a>
                 <nav style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;font-size:14px;color:${st.muted};">
-                  ${links.map(l => `<a href="#top" style="color:inherit;text-decoration:none;font-weight:500;">${esc(l)}</a>`).join('')}
-                  <a href="#cta" style="background:${btnBg};color:${btnFg};padding:8px 16px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:13px;">${esc(d.ctaText)}</a>
+                  ${links.map((l, i) => {
+                    const href = safeHref(urls[i], '#top');
+                    return `<a href="${esc(href)}"${extAttrs(href)} style="color:inherit;text-decoration:none;font-weight:500;">${esc(l)}</a>`;
+                  }).join('')}
+                  <a href="${esc(ctaHref)}"${extAttrs(ctaHref)} style="background:${btnBg};color:${btnFg};padding:8px 16px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:13px;">${esc(d.ctaText)}</a>
                 </nav>
               </div>
             </header>`;
@@ -605,8 +627,12 @@
                 <h1 ${ce} data-field="title" style="font-size:clamp(28px,4.5vw,48px);font-weight:800;line-height:1.12;letter-spacing:-0.03em;margin:0 0 16px;">${esc(d.title)}</h1>
                 <p ${ce} data-field="subtitle" style="font-size:clamp(15px,2vw,18px);line-height:1.6;color:${st.muted};margin:0 0 28px;max-width:640px;${mx}">${esc(d.subtitle)}</p>
                 <div style="display:flex;gap:12px;justify-content:${justify};flex-wrap:wrap;">
-                  <a href="#cta" style="background:${btnBg};color:${btnFg};padding:12px 24px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:15px;">${esc(d.ctaText)}</a>
-                  ${d.secondaryText ? `<a href="#features" style="background:${st.cardBg};color:${st.fg};border:1px solid ${st.borderCol};padding:12px 24px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:15px;">${esc(d.secondaryText)}</a>` : ''}
+                  ${(() => {
+                    const cHref = safeHref(d.ctaUrl, '#cta');
+                    const sHref = safeHref(d.secondaryUrl, '#features');
+                    return `<a href="${esc(cHref)}"${extAttrs(cHref)} style="background:${btnBg};color:${btnFg};padding:12px 24px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:15px;">${esc(d.ctaText)}</a>` +
+                      (d.secondaryText ? `<a href="${esc(sHref)}"${extAttrs(sHref)} style="background:${st.cardBg};color:${st.fg};border:1px solid ${st.borderCol};padding:12px 24px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:15px;">${esc(d.secondaryText)}</a>` : '');
+                  })()}
                 </div>
               </div>
             </section>`;
@@ -642,7 +668,10 @@
                   ${d.eyebrow ? `<div ${ce} data-field="eyebrow" style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${d.bg === 'dark' || d.bg === 'accent' ? st.fg : theme.accent};margin-bottom:8px;">${esc(d.eyebrow)}</div>` : ''}
                   <h2 ${ce} data-field="title" style="font-size:clamp(22px,3vw,32px);font-weight:800;line-height:1.2;margin:0 0 14px;">${esc(d.title)}</h2>
                   <p ${ce} data-field="text" style="font-size:15px;line-height:1.65;color:${st.muted};margin:0 0 22px;">${esc(d.text)}</p>
-                  ${d.ctaText ? `<a href="#cta" style="display:inline-block;background:${btnBg};color:${btnFg};padding:10px 20px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:14px;">${esc(d.ctaText)}</a>` : ''}
+                  ${d.ctaText ? (() => {
+                    const cHref = safeHref(d.ctaUrl, '#cta');
+                    return `<a href="${esc(cHref)}"${extAttrs(cHref)} style="display:inline-block;background:${btnBg};color:${btnFg};padding:10px 20px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:14px;">${esc(d.ctaText)}</a>`;
+                  })() : ''}
                 </div>
                 <div style="background:${theme.softBg};border:1px solid ${st.borderCol};border-radius:${radius};padding:48px 24px;text-align:center;color:${theme.text};">
                   <div style="font-size:54px;line-height:1;margin-bottom:12px;">${esc(d.visualEmoji || '✨')}</div>
@@ -655,7 +684,7 @@
         if (blk.type === 'pricing') {
           const plans = d.plans || [];
           return `
-            <section style="background:${st.bg};color:${st.fg};padding:${st.pad};">
+            <section id="pricing" style="background:${st.bg};color:${st.fg};padding:${st.pad};">
               <div style="max-width:1040px;margin:0 auto;">
                 <div style="text-align:${st.align};margin-bottom:36px;">
                   <h2 ${ce} data-field="title" style="font-size:clamp(22px,3vw,32px);font-weight:800;margin:0 0 8px;">${esc(d.title)}</h2>
@@ -675,7 +704,10 @@
                             ${feats.map(f => `<li>✓ ${esc(f)}</li>`).join('')}
                           </ul>
                         </div>
-                        <a href="#cta" style="display:block;text-align:center;background:${p.featured ? btnBg : 'transparent'};color:${p.featured ? btnFg : st.fg};border:1px solid ${p.featured ? btnBg : st.borderCol};padding:10px 16px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:14px;">Выбрать</a>
+                        ${(() => {
+                          const pHref = safeHref(p.ctaUrl, '#cta');
+                          return `<a href="${esc(pHref)}"${extAttrs(pHref)} style="display:block;text-align:center;background:${p.featured ? btnBg : 'transparent'};color:${p.featured ? btnFg : st.fg};border:1px solid ${p.featured ? btnBg : st.borderCol};padding:10px 16px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:14px;">${esc(p.ctaText || 'Выбрать')}</a>`;
+                        })()}
                       </div>`;
                   }).join('')}
                 </div>
@@ -718,6 +750,7 @@
 
         if (blk.type === 'footer') {
           const links = (d.links || '').split(',').map(s => s.trim()).filter(Boolean);
+          const urls = (d.linkUrls || '').split(',').map(s => s.trim());
           return `
             <footer style="background:${st.bg};color:${st.fg};padding:${st.pad};border-top:1px solid ${st.borderCol};">
               <div style="max-width:1040px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
@@ -726,7 +759,10 @@
                   <div ${ce} data-field="copy" style="font-size:12px;color:${st.muted};">${esc(d.copy)}</div>
                 </div>
                 <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:${st.muted};">
-                  ${links.map(l => `<a href="#top" style="color:inherit;text-decoration:none;">${esc(l)}</a>`).join('')}
+                  ${links.map((l, i) => {
+                    const href = safeHref(urls[i], '#top');
+                    return `<a href="${esc(href)}"${extAttrs(href)} style="color:inherit;text-decoration:none;">${esc(l)}</a>`;
+                  }).join('')}
                 </div>
               </div>
             </footer>`;
@@ -753,7 +789,7 @@
           const isSel = blk.id === selectedBlockId && !previewMode;
           const cat = BLOCK_CATALOG.find(c => c.type === blk.type);
           return `
-            <div class="block-wrapper ${isSel ? 'selected' : ''}" data-block-id="${blk.id}" data-index="${idx}" draggable="${!previewMode}">
+            <div class="block-wrapper ${isSel ? 'selected' : ''}" data-block-id="${blk.id}" data-index="${idx}" draggable="false">
               <div class="block-controls absolute top-1.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-slate-900/90 text-white px-1.5 py-1 rounded-lg shadow-md text-[11px]">
                 <span class="px-1.5 font-semibold text-slate-300 hidden sm:inline">${cat ? cat.label : blk.type}</span>
                 <button type="button" data-action="up" class="p-1 hover:bg-white/15 rounded ${idx === 0 ? 'opacity-30 pointer-events-none' : ''}" title="Вверх">↑</button>
@@ -782,7 +818,7 @@
               if (act === 'del') deleteBlock(id);
               return;
             }
-            if (e.target.tagName === 'A') e.preventDefault();
+            if (e.target.closest('a')) e.preventDefault();
             if (selectedBlockId !== id) {
               selectedBlockId = id;
               inspectorTab = 'block';
@@ -791,8 +827,24 @@
             }
           });
 
-          // Inline contenteditable sync
+          const controlsBar = el.querySelector('.block-controls');
+          if (controlsBar) {
+            controlsBar.addEventListener('mouseenter', () => { if (!previewMode) el.setAttribute('draggable', 'true'); });
+            controlsBar.addEventListener('mouseleave', () => { el.setAttribute('draggable', 'false'); });
+          }
+
+          // Inline contenteditable sync (never block native caret placement)
           el.querySelectorAll('[contenteditable="true"][data-field]').forEach(editable => {
+            editable.addEventListener('mousedown', e => {
+              e.stopPropagation();
+              el.setAttribute('draggable', 'false');
+              if (selectedBlockId !== id) {
+                selectedBlockId = id;
+                inspectorTab = 'block';
+                renderCanvasSelection();
+                renderInspector();
+              }
+            });
             editable.addEventListener('blur', () => {
               const field = editable.dataset.field;
               const blk = state.blocks.find(b => b.id === id);
@@ -952,9 +1004,22 @@
           </div>`;
 
         if (blk.type === 'navbar') {
-          fieldsHtml = textField('brand', 'Логотип / Название') + textField('links', 'Ссылки (через запятую)') + textField('ctaText', 'Текст кнопки');
+          fieldsHtml =
+            textField('brand', 'Логотип / Название') +
+            textField('brandUrl', 'Ссылка при клике на название') +
+            textField('links', 'Ссылки (через запятую)') +
+            textField('linkUrls', 'URL для ссылок (через запятую)') +
+            textField('ctaText', 'Текст кнопки') +
+            textField('ctaUrl', 'Ссылка кнопки');
         } else if (blk.type === 'hero') {
-          fieldsHtml = textField('badge', 'Бейдж сверху') + textField('title', 'Заголовок', true) + textField('subtitle', 'Подзаголовок', true) + textField('ctaText', 'Основная кнопка') + textField('secondaryText', 'Вторая кнопка');
+          fieldsHtml =
+            textField('badge', 'Бейдж сверху') +
+            textField('title', 'Заголовок', true) +
+            textField('subtitle', 'Подзаголовок', true) +
+            textField('ctaText', 'Основная кнопка') +
+            textField('ctaUrl', 'Ссылка основной кнопки') +
+            textField('secondaryText', 'Вторая кнопка') +
+            textField('secondaryUrl', 'Ссылка второй кнопки');
         } else if (blk.type === 'features') {
           fieldsHtml = textField('title', 'Заголовок секции') + textField('subtitle', 'Подзаголовок') +
             `<div class="pt-2 border-t border-slate-100 space-y-3">
@@ -970,7 +1035,7 @@
               `).join('')}
             </div>`;
         } else if (blk.type === 'split') {
-          fieldsHtml = textField('eyebrow', 'Надзаголовок') + textField('title', 'Заголовок', true) + textField('text', 'Описание', true) + textField('ctaText', 'Кнопка') + textField('visualEmoji', 'Эмодзи-иллюстрация') + textField('visualCaption', 'Подпись под картинкой');
+          fieldsHtml = textField('eyebrow', 'Надзаголовок') + textField('title', 'Заголовок', true) + textField('text', 'Описание', true) + textField('ctaText', 'Кнопка') + textField('ctaUrl', 'Ссылка кнопки') + textField('visualEmoji', 'Эмодзи-иллюстрация') + textField('visualCaption', 'Подпись под картинкой');
         } else if (blk.type === 'pricing') {
           fieldsHtml = textField('title', 'Заголовок') + textField('subtitle', 'Подзаголовок') +
             `<div class="pt-2 border-t border-slate-100 space-y-3">
@@ -983,6 +1048,10 @@
                   </div>
                   <input data-arr="plans" data-idx="${i}" data-sub="desc" value="${esc(p.desc)}" class="arr-input w-full px-2 py-1 text-xs rounded border border-slate-300 bg-white" placeholder="Кратко" />
                   <textarea data-arr="plans" data-idx="${i}" data-sub="features" rows="3" class="arr-input w-full px-2 py-1 text-xs rounded border border-slate-300 bg-white" placeholder="Плюсы (по строкам)">${esc(p.features)}</textarea>
+                  <div class="flex gap-1.5">
+                    <input data-arr="plans" data-idx="${i}" data-sub="ctaText" value="${esc(p.ctaText ?? 'Выбрать')}" class="arr-input flex-1 px-2 py-1 text-xs rounded border border-slate-300 bg-white" placeholder="Текст кнопки" />
+                    <input data-arr="plans" data-idx="${i}" data-sub="ctaUrl" value="${esc(p.ctaUrl ?? '#cta')}" class="arr-input flex-1 px-2 py-1 text-xs rounded border border-slate-300 bg-white" placeholder="Ссылка кнопки" />
+                  </div>
                 </div>
               `).join('')}
             </div>`;
@@ -1002,7 +1071,11 @@
         } else if (blk.type === 'cta') {
           fieldsHtml = textField('title', 'Заголовок', true) + textField('subtitle', 'Подзаголовок', true) + textField('placeholder', 'Placeholder поля') + textField('ctaText', 'Текст кнопки');
         } else if (blk.type === 'footer') {
-          fieldsHtml = textField('brand', 'Бренд') + textField('copy', 'Копирайт') + textField('links', 'Ссылки (через запятую)');
+          fieldsHtml =
+            textField('brand', 'Бренд') +
+            textField('copy', 'Копирайт') +
+            textField('links', 'Ссылки (через запятую)') +
+            textField('linkUrls', 'URL для ссылок (через запятую)');
         }
 
         body.innerHTML = `
@@ -1013,7 +1086,7 @@
             </div>
 
             <!-- Style Controls -->
-            <div class="grid grid-cols-2 gap-2.5">
+            <div class="grid ${blk.type === 'navbar' ? 'grid-cols-1' : 'grid-cols-2'} gap-2.5">
               <div>
                 <label class="block text-[11px] font-semibold text-slate-500 mb-1">Фон блока</label>
                 <select id="selBg" class="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-white">
@@ -1023,6 +1096,7 @@
                   <option value="dark" ${d.bg === 'dark' ? 'selected' : ''}>Тёмный</option>
                 </select>
               </div>
+              ${blk.type !== 'navbar' ? `
               <div>
                 <label class="block text-[11px] font-semibold text-slate-500 mb-1">Отступы</label>
                 <select id="selPad" class="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-white">
@@ -1030,16 +1104,17 @@
                   <option value="md" ${d.padding === 'md' ? 'selected' : ''}>Средние</option>
                   <option value="lg" ${d.padding === 'lg' ? 'selected' : ''}>Крупные</option>
                 </select>
-              </div>
+              </div>` : ''}
             </div>
 
+            ${blk.type !== 'navbar' ? `
             <div>
               <label class="block text-[11px] font-semibold text-slate-500 mb-1">Выравнивание</label>
               <div class="flex bg-slate-100 p-0.5 rounded-lg">
                 <button type="button" data-align="left" class="align-btn flex-1 py-1 rounded-md text-xs font-medium ${d.align !== 'center' ? 'bg-white shadow-xs text-slate-900' : 'text-slate-500'}">По левому краю</button>
                 <button type="button" data-align="center" class="align-btn flex-1 py-1 rounded-md text-xs font-medium ${d.align === 'center' ? 'bg-white shadow-xs text-slate-900' : 'text-slate-500'}">По центру</button>
               </div>
-            </div>
+            </div>` : ''}
 
             <div class="pt-2 border-t border-slate-100 space-y-3">
               ${fieldsHtml}
@@ -1050,9 +1125,12 @@
         body.querySelector('#selBg').addEventListener('change', e => {
           pushHistory(); blk.data.bg = e.target.value; saveState(); renderCanvas();
         });
-        body.querySelector('#selPad').addEventListener('change', e => {
-          pushHistory(); blk.data.padding = e.target.value; saveState(); renderCanvas();
-        });
+        const selPadEl = body.querySelector('#selPad');
+        if (selPadEl) {
+          selPadEl.addEventListener('change', e => {
+            pushHistory(); blk.data.padding = e.target.value; saveState(); renderCanvas();
+          });
+        }
         body.querySelectorAll('.align-btn').forEach(btn => {
           btn.addEventListener('click', () => {
             pushHistory(); blk.data.align = btn.dataset.align; saveState(); renderInspector(); renderCanvas();
