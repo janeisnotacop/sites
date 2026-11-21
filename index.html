@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
   <style>
+    ${state.customFont && state.customFont.dataUrl ? `@font-face { font-family: 'VibeCustomFont'; src: url('${state.customFont.dataUrl}'); font-display: swap; }` : ''}
     * { box-sizing: border-box; }
     body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
     .canvas-scroll::-webkit-scrollbar,
@@ -157,13 +158,18 @@
       <div class="p-4 bg-slate-950 overflow-auto flex-1">
         <pre id="exportCodePreview" class="text-xs text-emerald-300 font-mono whitespace-pre-wrap break-all"></pre>
       </div>
-      <div class="px-5 py-3.5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2">
-        <button type="button" id="btnCopyCode" class="px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 transition">
-          Копировать HTML
+      <div class="px-5 py-3.5 border-t border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
+        <button type="button" id="btnDownloadJson" class="px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 transition">
+          Экспорт проекта (.json)
         </button>
-        <button type="button" id="btnDownloadHtml" class="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition">
-          Скачать site.html
-        </button>
+        <div class="flex items-center gap-2">
+          <button type="button" id="btnCopyCode" class="px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 transition">
+            Копировать HTML
+          </button>
+          <button type="button" id="btnDownloadHtml" class="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition">
+            Скачать site.html
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -198,7 +204,8 @@
       const FONTS = {
         inter: { name: 'Inter (Современный)', css: "'Inter', system-ui, sans-serif" },
         serif: { name: 'Playfair (Журнальный)', css: "'Playfair Display', Georgia, serif" },
-        mono: { name: 'JetBrains Mono (Код)', css: "'JetBrains Mono', monospace" }
+        mono: { name: 'JetBrains Mono (Код)', css: "'JetBrains Mono', monospace" },
+        custom: { name: 'Кастомный (.ttf / .woff)', css: "'VibeCustomFont', 'Inter', system-ui, sans-serif" }
       };
 
       const BLOCK_CATALOG = [
@@ -476,6 +483,70 @@
           .replace(/"/g, '&quot;');
       }
 
+      function applyCustomFontStyle() {
+        let styleEl = document.getElementById('vibeCustomFontStyle');
+        if (!styleEl) {
+          styleEl = document.createElement('style');
+          styleEl.id = 'vibeCustomFontStyle';
+          document.head.appendChild(styleEl);
+        }
+        if (state.customFont && state.customFont.dataUrl) {
+          styleEl.textContent = `@font-face { font-family: 'VibeCustomFont'; src: url('${state.customFont.dataUrl}'); font-display: swap; }`;
+        } else {
+          styleEl.textContent = '';
+        }
+      }
+
+      function resolveFontCss(fontKeyOrName) {
+        const key = String(fontKeyOrName || '').trim();
+        if (FONTS[key.toLowerCase()]) return FONTS[key.toLowerCase()].css;
+        const clean = key.replace(/[^a-zA-Zа-яА-ЯёЁ0-9 _-]/g, '').trim();
+        return clean ? `'${clean}', sans-serif` : FONTS.inter.css;
+      }
+
+      // Safe inline formatting: <b>, <strong>, <i>, <em>, <u>, <s>, <del>, <mark>, <small>, <code>, <sup>, <sub>, <br>, and <font="serif|mono|inter|custom|FontName">...</font>
+      function richText(str) {
+        let out = esc(str);
+        const simpleTags = ['b', 'strong', 'i', 'em', 'u', 's', 'del', 'mark', 'small', 'code', 'sup', 'sub'];
+        simpleTags.forEach(tag => {
+          const re = new RegExp(`&lt;(\/?)${tag}&gt;`, 'gi');
+          out = out.replace(re, `<$1${tag}>`);
+        });
+        out = out.replace(/&lt;br\s*\/?&gt;/gi, '<br>');
+        out = out.replace(/&lt;font=(?:&quot;|&#39;)([^&<>]+?)(?:&quot;|&#39;)&gt;/gi, (_, name) => {
+          return `<span data-vibe-font="${esc(name.trim())}" style="font-family:${resolveFontCss(name)}">`;
+        });
+        out = out.replace(/&lt;\/font&gt;/gi, '</span>');
+        return out;
+      }
+
+      // Convert contenteditable HTML back to clean markup with allowed tags
+      function htmlToRichSource(el) {
+        const clone = el.cloneNode(true);
+        clone.querySelectorAll('span[data-vibe-font]').forEach(sp => {
+          const fname = sp.getAttribute('data-vibe-font');
+          const open = document.createTextNode(`<font="${fname}">`);
+          const close = document.createTextNode('</font>');
+          sp.parentNode.insertBefore(open, sp);
+          while (sp.firstChild) sp.parentNode.insertBefore(sp.firstChild, sp);
+          sp.parentNode.insertBefore(close, sp);
+          sp.remove();
+        });
+        let html = clone.innerHTML
+          .replace(/<br\s*\/?>/gi, '<br>')
+          .replace(/<div><br><\/div>/gi, '<br>')
+          .replace(/<div>/gi, '<br>')
+          .replace(/<\/div>/gi, '');
+        const allowed = new Set(['b', 'strong', 'i', 'em', 'u', 's', 'del', 'mark', 'small', 'code', 'sup', 'sub', 'br']);
+        html = html.replace(/<(\/?)([a-zA-Z0-9]+)(?:\s[^>]*)?>/g, (m, slash, tag) => {
+          const t = tag.toLowerCase();
+          return allowed.has(t) ? `<${slash}${t}>` : '';
+        });
+        const tmp = document.createElement('textarea');
+        tmp.innerHTML = html;
+        return tmp.value.trim();
+      }
+
       // Palette Rendering
       function renderPalette() {
         const list = document.getElementById('paletteList');
@@ -605,13 +676,13 @@
           return `
             <header style="background:${st.bg};color:${st.fg};border-bottom:1px solid ${st.borderCol};padding:16px 24px;">
               <div style="max-width:1040px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-                <a href="${esc(brandHref)}"${extAttrs(brandHref)} style="color:inherit;text-decoration:none;font-weight:800;font-size:18px;letter-spacing:-0.02em;"><span ${ce} data-field="brand">${esc(d.brand)}</span></a>
+                <a href="${esc(brandHref)}"${extAttrs(brandHref)} style="color:inherit;text-decoration:none;font-weight:800;font-size:18px;letter-spacing:-0.02em;"><span ${ce} data-field="brand">${richText(d.brand)}</span></a>
                 <nav style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;font-size:14px;color:${st.muted};">
                   ${links.map((l, i) => {
                     const href = safeHref(urls[i], '#top');
                     return `<a href="${esc(href)}"${extAttrs(href)} style="color:inherit;text-decoration:none;font-weight:500;">${esc(l)}</a>`;
                   }).join('')}
-                  <a href="${esc(ctaHref)}"${extAttrs(ctaHref)} style="background:${btnBg};color:${btnFg};padding:8px 16px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:13px;">${esc(d.ctaText)}</a>
+                  <a href="${esc(ctaHref)}"${extAttrs(ctaHref)} style="background:${btnBg};color:${btnFg};padding:8px 16px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:13px;">${richText(d.ctaText)}</a>
                 </nav>
               </div>
             </header>`;
@@ -623,15 +694,15 @@
           return `
             <section style="background:${st.bg};color:${st.fg};padding:${st.pad};text-align:${st.align};">
               <div style="max-width:820px;${mx}">
-                ${d.badge ? `<span ${ce} data-field="badge" style="display:inline-block;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:600;background:${st.cardBg};border:1px solid ${st.borderCol};color:${d.bg === 'dark' || d.bg === 'accent' ? st.fg : theme.accent};margin-bottom:16px;">${esc(d.badge)}</span>` : ''}
-                <h1 ${ce} data-field="title" style="font-size:clamp(28px,4.5vw,48px);font-weight:800;line-height:1.12;letter-spacing:-0.03em;margin:0 0 16px;">${esc(d.title)}</h1>
-                <p ${ce} data-field="subtitle" style="font-size:clamp(15px,2vw,18px);line-height:1.6;color:${st.muted};margin:0 0 28px;max-width:640px;${mx}">${esc(d.subtitle)}</p>
+                ${d.badge ? `<span ${ce} data-field="badge" style="display:inline-block;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:600;background:${st.cardBg};border:1px solid ${st.borderCol};color:${d.bg === 'dark' || d.bg === 'accent' ? st.fg : theme.accent};margin-bottom:16px;">${richText(d.badge)}</span>` : ''}
+                <h1 ${ce} data-field="title" style="font-size:clamp(28px,4.5vw,48px);font-weight:800;line-height:1.12;letter-spacing:-0.03em;margin:0 0 16px;">${richText(d.title)}</h1>
+                <p ${ce} data-field="subtitle" style="font-size:clamp(15px,2vw,18px);line-height:1.6;color:${st.muted};margin:0 0 28px;max-width:640px;${mx}">${richText(d.subtitle)}</p>
                 <div style="display:flex;gap:12px;justify-content:${justify};flex-wrap:wrap;">
                   ${(() => {
                     const cHref = safeHref(d.ctaUrl, '#cta');
                     const sHref = safeHref(d.secondaryUrl, '#features');
-                    return `<a href="${esc(cHref)}"${extAttrs(cHref)} style="background:${btnBg};color:${btnFg};padding:12px 24px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:15px;">${esc(d.ctaText)}</a>` +
-                      (d.secondaryText ? `<a href="${esc(sHref)}"${extAttrs(sHref)} style="background:${st.cardBg};color:${st.fg};border:1px solid ${st.borderCol};padding:12px 24px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:15px;">${esc(d.secondaryText)}</a>` : '');
+                    return `<a href="${esc(cHref)}"${extAttrs(cHref)} style="background:${btnBg};color:${btnFg};padding:12px 24px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:15px;">${richText(d.ctaText)}</a>` +
+                      (d.secondaryText ? `<a href="${esc(sHref)}"${extAttrs(sHref)} style="background:${st.cardBg};color:${st.fg};border:1px solid ${st.borderCol};padding:12px 24px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:15px;">${richText(d.secondaryText)}</a>` : '');
                   })()}
                 </div>
               </div>
@@ -644,15 +715,15 @@
             <section id="features" style="background:${st.bg};color:${st.fg};padding:${st.pad};">
               <div style="max-width:1040px;margin:0 auto;">
                 <div style="text-align:${st.align};margin-bottom:36px;">
-                  <h2 ${ce} data-field="title" style="font-size:clamp(22px,3vw,32px);font-weight:800;letter-spacing:-0.02em;margin:0 0 8px;">${esc(d.title)}</h2>
-                  <p ${ce} data-field="subtitle" style="font-size:15px;color:${st.muted};margin:0;">${esc(d.subtitle)}</p>
+                  <h2 ${ce} data-field="title" style="font-size:clamp(22px,3vw,32px);font-weight:800;letter-spacing:-0.02em;margin:0 0 8px;">${richText(d.title)}</h2>
+                  <p ${ce} data-field="subtitle" style="font-size:15px;color:${st.muted};margin:0;">${richText(d.subtitle)}</p>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;">
                   ${items.map(it => `
                     <div style="background:${st.cardBg};border:1px solid ${st.borderCol};border-radius:${radius};padding:24px;text-align:left;">
                       <div style="font-size:26px;margin-bottom:12px;">${esc(it.icon)}</div>
-                      <h3 style="font-size:17px;font-weight:700;margin:0 0 8px;">${esc(it.title)}</h3>
-                      <p style="font-size:14px;line-height:1.55;color:${st.muted};margin:0;">${esc(it.text)}</p>
+                      <h3 style="font-size:17px;font-weight:700;margin:0 0 8px;">${richText(it.title)}</h3>
+                      <p style="font-size:14px;line-height:1.55;color:${st.muted};margin:0;">${richText(it.text)}</p>
                     </div>
                   `).join('')}
                 </div>
@@ -665,12 +736,12 @@
             <section style="background:${st.bg};color:${st.fg};padding:${st.pad};">
               <div style="max-width:1040px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:32px;align-items:center;">
                 <div style="text-align:${st.align};">
-                  ${d.eyebrow ? `<div ${ce} data-field="eyebrow" style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${d.bg === 'dark' || d.bg === 'accent' ? st.fg : theme.accent};margin-bottom:8px;">${esc(d.eyebrow)}</div>` : ''}
-                  <h2 ${ce} data-field="title" style="font-size:clamp(22px,3vw,32px);font-weight:800;line-height:1.2;margin:0 0 14px;">${esc(d.title)}</h2>
-                  <p ${ce} data-field="text" style="font-size:15px;line-height:1.65;color:${st.muted};margin:0 0 22px;">${esc(d.text)}</p>
+                  ${d.eyebrow ? `<div ${ce} data-field="eyebrow" style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${d.bg === 'dark' || d.bg === 'accent' ? st.fg : theme.accent};margin-bottom:8px;">${richText(d.eyebrow)}</div>` : ''}
+                  <h2 ${ce} data-field="title" style="font-size:clamp(22px,3vw,32px);font-weight:800;line-height:1.2;margin:0 0 14px;">${richText(d.title)}</h2>
+                  <p ${ce} data-field="text" style="font-size:15px;line-height:1.65;color:${st.muted};margin:0 0 22px;">${richText(d.text)}</p>
                   ${d.ctaText ? (() => {
                     const cHref = safeHref(d.ctaUrl, '#cta');
-                    return `<a href="${esc(cHref)}"${extAttrs(cHref)} style="display:inline-block;background:${btnBg};color:${btnFg};padding:10px 20px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:14px;">${esc(d.ctaText)}</a>`;
+                    return `<a href="${esc(cHref)}"${extAttrs(cHref)} style="display:inline-block;background:${btnBg};color:${btnFg};padding:10px 20px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:14px;">${richText(d.ctaText)}</a>`;
                   })() : ''}
                 </div>
                 <div style="background:${theme.softBg};border:1px solid ${st.borderCol};border-radius:${radius};padding:48px 24px;text-align:center;color:${theme.text};">
@@ -687,8 +758,8 @@
             <section id="pricing" style="background:${st.bg};color:${st.fg};padding:${st.pad};">
               <div style="max-width:1040px;margin:0 auto;">
                 <div style="text-align:${st.align};margin-bottom:36px;">
-                  <h2 ${ce} data-field="title" style="font-size:clamp(22px,3vw,32px);font-weight:800;margin:0 0 8px;">${esc(d.title)}</h2>
-                  <p ${ce} data-field="subtitle" style="font-size:15px;color:${st.muted};margin:0;">${esc(d.subtitle)}</p>
+                  <h2 ${ce} data-field="title" style="font-size:clamp(22px,3vw,32px);font-weight:800;margin:0 0 8px;">${richText(d.title)}</h2>
+                  <p ${ce} data-field="subtitle" style="font-size:15px;color:${st.muted};margin:0;">${richText(d.subtitle)}</p>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:20px;align-items:stretch;">
                   ${plans.map(p => {
@@ -697,16 +768,16 @@
                     return `
                       <div style="background:${st.cardBg};border:${border};border-radius:${radius};padding:26px;display:flex;flex-direction:column;justify-content:space-between;text-align:left;">
                         <div>
-                          <div style="font-size:15px;font-weight:700;margin-bottom:4px;">${esc(p.name)}</div>
-                          <div style="font-size:13px;color:${st.muted};margin-bottom:16px;">${esc(p.desc)}</div>
-                          <div style="font-size:28px;font-weight:800;margin-bottom:18px;">${esc(p.price)}</div>
+                          <div style="font-size:15px;font-weight:700;margin-bottom:4px;">${richText(p.name)}</div>
+                          <div style="font-size:13px;color:${st.muted};margin-bottom:16px;">${richText(p.desc)}</div>
+                          <div style="font-size:28px;font-weight:800;margin-bottom:18px;">${richText(p.price)}</div>
                           <ul style="list-style:none;padding:0;margin:0 0 22px;font-size:13px;line-height:1.8;color:${st.muted};">
-                            ${feats.map(f => `<li>✓ ${esc(f)}</li>`).join('')}
+                            ${feats.map(f => `<li>✓ ${richText(f)}</li>`).join('')}
                           </ul>
                         </div>
                         ${(() => {
                           const pHref = safeHref(p.ctaUrl, '#cta');
-                          return `<a href="${esc(pHref)}"${extAttrs(pHref)} style="display:block;text-align:center;background:${p.featured ? btnBg : 'transparent'};color:${p.featured ? btnFg : st.fg};border:1px solid ${p.featured ? btnBg : st.borderCol};padding:10px 16px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:14px;">${esc(p.ctaText || 'Выбрать')}</a>`;
+                          return `<a href="${esc(pHref)}"${extAttrs(pHref)} style="display:block;text-align:center;background:${p.featured ? btnBg : 'transparent'};color:${p.featured ? btnFg : st.fg};border:1px solid ${p.featured ? btnBg : st.borderCol};padding:10px 16px;border-radius:${radius};text-decoration:none;font-weight:600;font-size:14px;">${richText(p.ctaText || 'Выбрать')}</a>`;
                         })()}
                       </div>`;
                   }).join('')}
@@ -720,13 +791,13 @@
           return `
             <section style="background:${st.bg};color:${st.fg};padding:${st.pad};">
               <div style="max-width:1040px;margin:0 auto;">
-                <h2 ${ce} data-field="title" style="font-size:clamp(22px,3vw,30px);font-weight:800;text-align:${st.align};margin:0 0 28px;">${esc(d.title)}</h2>
+                <h2 ${ce} data-field="title" style="font-size:clamp(22px,3vw,30px);font-weight:800;text-align:${st.align};margin:0 0 28px;">${richText(d.title)}</h2>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;">
                   ${reviews.map(r => `
                     <div style="background:${st.cardBg};border:1px solid ${st.borderCol};border-radius:${radius};padding:24px;text-align:left;">
-                      <p style="font-size:14px;line-height:1.65;margin:0 0 16px;">«${esc(r.quote)}»</p>
-                      <div style="font-size:13px;font-weight:700;">${esc(r.author)}</div>
-                      <div style="font-size:12px;color:${st.muted};">${esc(r.role)}</div>
+                      <p style="font-size:14px;line-height:1.65;margin:0 0 16px;">«${richText(r.quote)}»</p>
+                      <div style="font-size:13px;font-weight:700;">${richText(r.author)}</div>
+                      <div style="font-size:12px;color:${st.muted};">${richText(r.role)}</div>
                     </div>
                   `).join('')}
                 </div>
@@ -738,11 +809,11 @@
           return `
             <section id="cta" style="background:${st.bg};color:${st.fg};padding:${st.pad};text-align:${st.align};">
               <div style="max-width:680px;${st.align === 'center' ? 'margin:0 auto;' : ''}">
-                <h2 ${ce} data-field="title" style="font-size:clamp(24px,3.5vw,34px);font-weight:800;margin:0 0 10px;">${esc(d.title)}</h2>
-                <p ${ce} data-field="subtitle" style="font-size:15px;color:${st.muted};margin:0 0 24px;">${esc(d.subtitle)}</p>
+                <h2 ${ce} data-field="title" style="font-size:clamp(24px,3.5vw,34px);font-weight:800;margin:0 0 10px;">${richText(d.title)}</h2>
+                <p ${ce} data-field="subtitle" style="font-size:15px;color:${st.muted};margin:0 0 24px;">${richText(d.subtitle)}</p>
                 <form class="vibe-cta-form" style="display:flex;gap:10px;justify-content:${st.align === 'center' ? 'center' : 'flex-start'};flex-wrap:wrap;">
                   <input type="email" required placeholder="${esc(d.placeholder)}" style="padding:11px 16px;border-radius:${radius};border:1px solid ${st.borderCol};background:#ffffff;color:#0f172a;font-size:14px;min-width:220px;flex:1;max-width:300px;" />
-                  <button type="submit" style="background:${btnBg};color:${btnFg};border:none;padding:11px 22px;border-radius:${radius};font-weight:600;font-size:14px;cursor:pointer;">${esc(d.ctaText)}</button>
+                  <button type="submit" style="background:${btnBg};color:${btnFg};border:none;padding:11px 22px;border-radius:${radius};font-weight:600;font-size:14px;cursor:pointer;">${richText(d.ctaText)}</button>
                 </form>
               </div>
             </section>`;
@@ -755,8 +826,8 @@
             <footer style="background:${st.bg};color:${st.fg};padding:${st.pad};border-top:1px solid ${st.borderCol};">
               <div style="max-width:1040px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
                 <div>
-                  <div ${ce} data-field="brand" style="font-weight:800;font-size:15px;margin-bottom:4px;">${esc(d.brand)}</div>
-                  <div ${ce} data-field="copy" style="font-size:12px;color:${st.muted};">${esc(d.copy)}</div>
+                  <div ${ce} data-field="brand" style="font-weight:800;font-size:15px;margin-bottom:4px;">${richText(d.brand)}</div>
+                  <div ${ce} data-field="copy" style="font-size:12px;color:${st.muted};">${richText(d.copy)}</div>
                 </div>
                 <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:${st.muted};">
                   ${links.map((l, i) => {
@@ -849,7 +920,7 @@
               const field = editable.dataset.field;
               const blk = state.blocks.find(b => b.id === id);
               if (!blk) return;
-              const nextVal = editable.textContent.trim();
+              const nextVal = htmlToRichSource(editable);
               if (blk.data[field] !== nextVal) {
                 pushHistory();
                 blk.data[field] = nextVal;
@@ -948,6 +1019,14 @@
                 <select id="selFont" class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-indigo-500">
                   ${Object.entries(FONTS).map(([k, f]) => `<option value="${k}" ${state.font === k ? 'selected' : ''}>${f.name}</option>`).join('')}
                 </select>
+                <div class="mt-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-[11px] font-semibold text-slate-600">Свой шрифт (.ttf / .otf / .woff)</span>
+                    ${state.customFont ? `<button type="button" id="btnRemoveCustomFont" class="text-[11px] text-rose-600 hover:underline">Удалить</button>` : ''}
+                  </div>
+                  <input id="inpCustomFont" type="file" accept=".ttf,.otf,.woff,.woff2" class="block w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer" />
+                  <div class="text-[11px] text-slate-400 truncate">${state.customFont ? 'Загружен: ' + esc(state.customFont.name) : 'Используется в пункте «Кастомный» и теге <font="custom">'}</div>
+                </div>
               </div>
 
               <div>
@@ -974,6 +1053,36 @@
             saveState();
             renderAll();
           });
+          body.querySelector('#inpCustomFont').addEventListener('change', e => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            if (file.size > 3 * 1024 * 1024) {
+              showToast('Файл > 3 МБ может не сохраниться в браузере');
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+              pushHistory();
+              state.customFont = { name: file.name, dataUrl: reader.result };
+              state.font = 'custom';
+              saveState();
+              applyCustomFontStyle();
+              renderAll();
+              showToast('Шрифт загружен: ' + file.name);
+            };
+            reader.readAsDataURL(file);
+          });
+          const btnRemFont = body.querySelector('#btnRemoveCustomFont');
+          if (btnRemFont) {
+            btnRemFont.addEventListener('click', () => {
+              pushHistory();
+              delete state.customFont;
+              if (state.font === 'custom') state.font = 'inter';
+              saveState();
+              applyCustomFontStyle();
+              renderAll();
+              showToast('Кастомный шрифт удалён');
+            });
+          }
           body.querySelector('#rngRadius').addEventListener('input', e => {
             state.radius = e.target.value;
             saveState();
@@ -1028,9 +1137,9 @@
                 <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
                   <div class="flex gap-1.5">
                     <input data-arr="items" data-idx="${i}" data-sub="icon" value="${esc(it.icon)}" class="arr-input w-12 text-center px-1.5 py-1 text-xs rounded border border-slate-300 bg-white" />
-                    <input data-arr="items" data-idx="${i}" data-sub="title" value="${esc(it.title)}" class="arr-input flex-1 px-2 py-1 text-xs font-medium rounded border border-slate-300 bg-white" />
+                    <input data-arr="items" data-idx="${i}" data-sub="title" value="${richText(it.title)}" class="arr-input flex-1 px-2 py-1 text-xs font-medium rounded border border-slate-300 bg-white" />
                   </div>
-                  <textarea data-arr="items" data-idx="${i}" data-sub="text" rows="2" class="arr-input w-full px-2 py-1 text-xs rounded border border-slate-300 bg-white">${esc(it.text)}</textarea>
+                  <textarea data-arr="items" data-idx="${i}" data-sub="text" rows="2" class="arr-input w-full px-2 py-1 text-xs rounded border border-slate-300 bg-white">${richText(it.text)}</textarea>
                 </div>
               `).join('')}
             </div>`;
@@ -1043,10 +1152,10 @@
               ${d.plans.map((p, i) => `
                 <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
                   <div class="flex gap-1.5">
-                    <input data-arr="plans" data-idx="${i}" data-sub="name" value="${esc(p.name)}" class="arr-input flex-1 px-2 py-1 text-xs font-semibold rounded border border-slate-300 bg-white" placeholder="Название" />
-                    <input data-arr="plans" data-idx="${i}" data-sub="price" value="${esc(p.price)}" class="arr-input w-24 px-2 py-1 text-xs rounded border border-slate-300 bg-white" placeholder="Цена" />
+                    <input data-arr="plans" data-idx="${i}" data-sub="name" value="${richText(p.name)}" class="arr-input flex-1 px-2 py-1 text-xs font-semibold rounded border border-slate-300 bg-white" placeholder="Название" />
+                    <input data-arr="plans" data-idx="${i}" data-sub="price" value="${richText(p.price)}" class="arr-input w-24 px-2 py-1 text-xs rounded border border-slate-300 bg-white" placeholder="Цена" />
                   </div>
-                  <input data-arr="plans" data-idx="${i}" data-sub="desc" value="${esc(p.desc)}" class="arr-input w-full px-2 py-1 text-xs rounded border border-slate-300 bg-white" placeholder="Кратко" />
+                  <input data-arr="plans" data-idx="${i}" data-sub="desc" value="${richText(p.desc)}" class="arr-input w-full px-2 py-1 text-xs rounded border border-slate-300 bg-white" placeholder="Кратко" />
                   <textarea data-arr="plans" data-idx="${i}" data-sub="features" rows="3" class="arr-input w-full px-2 py-1 text-xs rounded border border-slate-300 bg-white" placeholder="Плюсы (по строкам)">${esc(p.features)}</textarea>
                   <div class="flex gap-1.5">
                     <input data-arr="plans" data-idx="${i}" data-sub="ctaText" value="${esc(p.ctaText ?? 'Выбрать')}" class="arr-input flex-1 px-2 py-1 text-xs rounded border border-slate-300 bg-white" placeholder="Текст кнопки" />
@@ -1060,10 +1169,10 @@
             `<div class="pt-2 border-t border-slate-100 space-y-3">
               ${d.reviews.map((r, i) => `
                 <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
-                  <textarea data-arr="reviews" data-idx="${i}" data-sub="quote" rows="2" class="arr-input w-full px-2 py-1 text-xs rounded border border-slate-300 bg-white">${esc(r.quote)}</textarea>
+                  <textarea data-arr="reviews" data-idx="${i}" data-sub="quote" rows="2" class="arr-input w-full px-2 py-1 text-xs rounded border border-slate-300 bg-white">${richText(r.quote)}</textarea>
                   <div class="flex gap-1.5">
-                    <input data-arr="reviews" data-idx="${i}" data-sub="author" value="${esc(r.author)}" class="arr-input flex-1 px-2 py-1 text-xs font-medium rounded border border-slate-300 bg-white" />
-                    <input data-arr="reviews" data-idx="${i}" data-sub="role" value="${esc(r.role)}" class="arr-input flex-1 px-2 py-1 text-xs rounded border border-slate-300 bg-white" />
+                    <input data-arr="reviews" data-idx="${i}" data-sub="author" value="${richText(r.author)}" class="arr-input flex-1 px-2 py-1 text-xs font-medium rounded border border-slate-300 bg-white" />
+                    <input data-arr="reviews" data-idx="${i}" data-sub="role" value="${richText(r.role)}" class="arr-input flex-1 px-2 py-1 text-xs rounded border border-slate-300 bg-white" />
                   </div>
                 </div>
               `).join('')}
@@ -1117,6 +1226,9 @@
             </div>` : ''}
 
             <div class="pt-2 border-t border-slate-100 space-y-3">
+              <div class="text-[11px] text-slate-400 bg-slate-50 border border-slate-200/70 rounded-lg px-2.5 py-1.5 leading-relaxed">
+                Теги: <code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, <code>&lt;u&gt;</code>, <code>&lt;s&gt;</code>, <code>&lt;mark&gt;</code>, <code>&lt;font="serif"&gt;</code> (или <code>mono</code>, <code>custom</code>, имя шрифта)
+              </div>
               ${fieldsHtml}
             </div>
           </div>`;
@@ -1169,6 +1281,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
   <style>
+    ${state.customFont && state.customFont.dataUrl ? `@font-face { font-family: 'VibeCustomFont'; src: url('${state.customFont.dataUrl}'); font-display: swap; }` : ''}
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body { margin: 0; font-family: ${font.css}; background: #ffffff; color: #0f172a; }
@@ -1210,6 +1323,7 @@ ${bodyHtml}
 
       // Render All
       function renderAll() {
+        applyCustomFontStyle();
         renderCanvas();
         renderInspector();
         updateHistoryButtons();
@@ -1340,6 +1454,20 @@ ${bodyHtml}
         }
         document.body.removeChild(ta);
       }
+
+      document.getElementById('btnDownloadJson').addEventListener('click', () => {
+        const json = JSON.stringify(state, null, 2);
+        const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'vibesite-project.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Проект сохранён в vibesite-project.json');
+      });
 
       document.getElementById('btnDownloadHtml').addEventListener('click', () => {
         const blob = new Blob([buildExportHtml()], { type: 'text/html;charset=utf-8' });
